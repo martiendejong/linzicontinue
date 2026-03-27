@@ -1,0 +1,702 @@
+/* Linzi Security - Admin Dashboard Styles */
+
+.linzi-wrap {
+    max-width: 1200px;
+    margin-top: 20px;
+}
+
+.linzi-header {
+    display: flex;
+    align-items: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.linzi-version {
+    font-size: 12px;
+    color: #999;
+    margin-left: 10px;
+    font-weight: normal;
+}
+
+/* ====================================================================
+   TOPBAR - Score + Stats + Actions
+   ==================================================================== */
+
+.linzi-topbar {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 20px 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    flex-wrap: wrap;
+}
+
+.linzi-topbar-score {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 4px solid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #fff;
+}
+
+.linzi-topbar-score-num {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.linzi-topbar-score-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.linzi-topbar-stats {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+}
+
+.linzi-topbar-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 55px;
+}
+
+.linzi-topbar-stat-num {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.linzi-topbar-stat span:last-child {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.linzi-topbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 780px) {
+    .linzi-topbar {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+    .linzi-topbar-score {
+        margin: 0 auto;
+    }
+    .linzi-topbar-stats {
+        justify-content: center;
+    }
+    .linzi-topbar-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}
+
+/* Severity colors */
+.linzi-color-critical { color: #dc3232; }
+.linzi-color-high { color: #ff6b00; }
+.linzi-color-medium { color: #ffb900; }
+.linzi-color-low { color: #46b450; }
+
+/* ====================================================================
+   ALL CLEAR state
+   ==================================================================== */
+
+.linzi-all-clear {
+    text-align: center;
+    padding: 50px 20px;
+}
+
+.linzi-all-clear-icon {
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 10px;
+}
+
+.linzi-all-clear h2 {
+    color: #46b450;
+    font-size: 28px;
+    margin: 10px 0 5px;
+    border: none;
+    padding: 0;
+}
+
+.linzi-all-clear p {
+    color: #666;
+    font-size: 15px;
+    margin: 5px 0;
+}
+
+/* ====================================================================
+   ISSUE GROUPS - Category containers
+   ==================================================================== */
+
+.linzi-issue-group {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.linzi-issue-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    flex-wrap: wrap;
+}
+
+.linzi-issue-group-header .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: #555;
+}
+
+.linzi-issue-group-header h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    padding: 0;
+}
+
+.linzi-issue-count {
+    font-size: 12px;
+    color: #888;
+    margin-left: auto;
+}
+
+/* ====================================================================
+   ISSUE CARDS - Individual issue display
+   ==================================================================== */
+
+.linzi-issue-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.15s ease;
+}
+
+.linzi-issue-card:last-child {
+    border-bottom: none;
+}
+
+.linzi-issue-card:hover {
+    background: #fafbfc;
+}
+
+/* Severity-based left border */
+.linzi-issue-critical {
+    border-left: 4px solid #dc3232;
+    background: #fef8f8;
+}
+.linzi-issue-critical:hover { background: #fef2f2; }
+
+.linzi-issue-high {
+    border-left: 4px solid #ff6b00;
+    background: #fefaf5;
+}
+.linzi-issue-high:hover { background: #fff7ed; }
+
+.linzi-issue-medium {
+    border-left: 4px solid #ffb900;
+    background: #fffdf5;
+}
+.linzi-issue-medium:hover { background: #fffbeb; }
+
+.linzi-issue-low {
+    border-left: 4px solid #46b450;
+}
+
+.linzi-issue-severity {
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.linzi-issue-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.linzi-issue-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: #1d2327;
+}
+
+.linzi-issue-desc {
+    font-size: 13px;
+    color: #555;
+    line-height: 1.5;
+    margin-bottom: 4px;
+}
+
+.linzi-issue-path code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    word-break: break-all;
+}
+
+.linzi-issue-time {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.linzi-issue-manual {
+    font-size: 12px;
+    color: #826200;
+    background: #fffbe5;
+    padding: 6px 10px;
+    border-radius: 3px;
+    margin-top: 6px;
+    border: 1px solid #ffe399;
+}
+
+.linzi-issue-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+@media (max-width: 780px) {
+    .linzi-issue-card {
+        flex-direction: column;
+    }
+    .linzi-issue-actions {
+        width: 100%;
+    }
+}
+
+/* ====================================================================
+   FIX BUTTONS
+   ==================================================================== */
+
+.linzi-fix-btn {
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.linzi-fix-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.linzi-fix-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.linzi-btn-danger {
+    background: #dc3232 !important;
+    color: #fff !important;
+    border-color: #b02a2a !important;
+}
+
+.linzi-btn-danger:hover {
+    background: #b02a2a !important;
+}
+
+.linzi-fix-all-btn {
+    white-space: nowrap;
+}
+
+.linzi-fix-all-btn:hover {
+    background: #b02a2a !important;
+}
+
+/* Fix result toast */
+.linzi-toast {
+    position: fixed;
+    top: 40px;
+    right: 20px;
+    z-index: 100100;
+    padding: 12px 20px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    animation: linzi-toast-in 0.3s ease;
+    max-width: 400px;
+}
+
+.linzi-toast-success { background: #46b450; }
+.linzi-toast-error { background: #dc3232; }
+
+@keyframes linzi-toast-in {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ====================================================================
+   ORIGINAL STYLES - Score Card, Stats, Sections
+   ==================================================================== */
+
+/* Score Card */
+.linzi-score-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-left-width: 4px;
+    border-radius: 4px;
+    padding: 30px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.linzi-score-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 4px solid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.linzi-score-number {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.linzi-score-label {
+    font-size: 14px;
+    color: #666;
+}
+
+.linzi-score-info h2 {
+    margin: 0 0 5px 0;
+}
+
+.linzi-score-info p {
+    color: #666;
+    margin: 0 0 15px 0;
+}
+
+/* Stats Grid */
+.linzi-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 960px) {
+    .linzi-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.linzi-stat-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.15s ease;
+}
+
+.linzi-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+.linzi-stat-icon {
+    margin-bottom: 8px;
+}
+
+.linzi-stat-icon .dashicons {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+}
+
+.linzi-stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.linzi-stat-label {
+    font-size: 13px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.linzi-stat-success { border-top: 3px solid #46b450; }
+.linzi-stat-success .linzi-stat-icon .dashicons { color: #46b450; }
+
+.linzi-stat-warning { border-top: 3px solid #ffb900; }
+.linzi-stat-warning .linzi-stat-icon .dashicons { color: #ffb900; }
+
+.linzi-stat-danger { border-top: 3px solid #dc3232; }
+.linzi-stat-danger .linzi-stat-icon .dashicons { color: #dc3232; }
+
+.linzi-stat-info { border-top: 3px solid #0073aa; }
+.linzi-stat-info .linzi-stat-icon .dashicons { color: #0073aa; }
+
+/* Sections */
+.linzi-section {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.linzi-section h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* Actions Grid */
+.linzi-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 780px) {
+    .linzi-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.linzi-action-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.15s ease;
+    font-weight: 500;
+}
+
+.linzi-action-card:hover {
+    background: #0073aa;
+    color: #fff;
+    border-color: #0073aa;
+    transform: translateY(-1px);
+}
+
+.linzi-action-card .dashicons {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+}
+
+/* Tables */
+.linzi-table {
+    border-collapse: collapse;
+}
+
+.linzi-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.linzi-table td,
+.linzi-table th {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.linzi-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.linzi-table code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* Threat rows */
+.linzi-threat-critical { background: #fef2f2 !important; }
+.linzi-threat-high { background: #fff7ed !important; }
+.linzi-threat-medium { background: #fffbeb !important; }
+
+/* Severity badges */
+.linzi-severity {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.linzi-severity-critical {
+    background: #dc3232;
+    color: #fff;
+}
+
+.linzi-severity-high {
+    background: #ff6b00;
+    color: #fff;
+}
+
+.linzi-severity-medium {
+    background: #ffb900;
+    color: #333;
+}
+
+.linzi-severity-low {
+    background: #46b450;
+    color: #fff;
+}
+
+/* Progress Bar */
+.linzi-progress-bar {
+    height: 20px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.linzi-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0073aa, #00a0d2);
+    border-radius: 10px;
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+.linzi-progress-animated {
+    animation: linzi-progress-animation 2s infinite;
+    width: 100% !important;
+    background: linear-gradient(90deg, #0073aa 0%, #00a0d2 50%, #0073aa 100%);
+    background-size: 200% 100%;
+}
+
+@keyframes linzi-progress-animation {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.linzi-scan-status-text {
+    color: #666;
+    font-style: italic;
+}
+
+/* Success Message */
+.linzi-success-message {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.linzi-success-message h3 {
+    color: #46b450;
+    margin: 10px 0 5px;
+}
+
+.linzi-success-message p {
+    color: #666;
+}
+
+/* Loading */
+.linzi-loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+/* Buttons */
+.linzi-scan-btn {
+    margin-right: 8px !important;
+}
+
+.linzi-quarantine-btn {
+    margin-right: 5px !important;
+}
+
+/* Activity Log */
+.linzi-activity-table .severity-critical td { border-left: 3px solid #dc3232; }
+.linzi-activity-table .severity-warning td { border-left: 3px solid #ffb900; }
+.linzi-activity-table .severity-info td { border-left: 3px solid #0073aa; }
+
+/* Form tables in settings */
+.linzi-section .form-table th {
+    width: 200px;
+    padding: 15px 10px;
+}
+
+.linzi-section .form-table td {
+    padding: 15px 10px;
+}
+
+/* Pagination */
+.linzi-pagination {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.linzi-pagination .page-numbers {
+    display: inline-block;
+    padding: 5px 12px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    text-decoration: none;
+    color: #333;
+}
+
+.linzi-pagination .page-numbers.current {
+    background: #0073aa;
+    color: #fff;
+    border-color: #0073aa;
+}

@@ -1,0 +1,26 @@
+{
+    "_meta": {
+        "version": "1.0.0",
+        "updated": "2026-03-26",
+        "description": "Linzi malware signature database. Based on real-world breach forensics.",
+        "total_signatures": 30,
+        "categories": [
+            "backdoor",
+            "obfuscation",
+            "fake_plugin",
+            "mu_backdoor",
+            "polymorphic",
+            "file_operation",
+            "db_manipulation",
+            "network",
+            "exfiltration",
+            "exploit",
+            "cryptominer",
+            "seo_spam",
+            "webshell",
+            "info_disclosure"
+        ]
+    },
+    "_instructions": "To add custom signatures, add entries to the 'custom' array below. Each entry needs: id, name, pattern (regex), severity (critical/high/medium/low), type.",
+    "custom": []
+}
