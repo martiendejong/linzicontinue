@@ -344,6 +344,17 @@ class Linzi_Dashboard {
                             <?php if (!empty($issue['file_path'])) : ?>
                                 <div class="linzi-issue-path"><code><?php echo esc_html($issue['file_path']); ?></code></div>
                             <?php endif; ?>
+                            <?php if (!empty($issue['confidence'])) : ?>
+                                <div class="linzi-issue-confidence">
+                                    <strong>Confidence:</strong>
+                                    <span class="linzi-confidence-badge linzi-confidence-<?php echo $issue['confidence'] >= 80 ? 'high' : ($issue['confidence'] >= 60 ? 'medium' : 'low'); ?>">
+                                        <?php echo esc_html($issue['confidence']); ?>%
+                                    </span>
+                                    <?php if ($issue['confidence'] < 70) : ?>
+                                        <span style="color:#666;font-size:11px"> (may be false positive)</span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
                             <?php if (!empty($issue['detected_at'])) : ?>
                                 <div class="linzi-issue-time">Detected: <?php echo esc_html($issue['detected_at']); ?></div>
                             <?php endif; ?>

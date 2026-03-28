@@ -398,13 +398,19 @@ class Linzi_Scanner {
                         continue;
                     }
 
+                    // Calculate confidence score and adjust severity
+                    $confidence = $this->calculate_confidence($content, $filepath, $sig);
+                    $adjusted_severity = $this->adjust_severity($sig['severity'], $filepath, $confidence);
+
                     $results['threats'][] = [
-                        'file_path'   => $filepath,
-                        'threat_type' => $sig['type'],
-                        'severity'    => $sig['severity'],
-                        'signature'   => $sig['id'],
-                        'description' => $sig['name'] . ' - Match: ' . substr($matches[0], 0, 100),
-                        'file_hash'   => hash('sha256', $content),
+                        'file_path'         => $filepath,
+                        'threat_type'       => $sig['type'],
+                        'severity'          => $adjusted_severity,
+                        'original_severity' => $sig['severity'],
+                        'confidence'        => $confidence,
+                        'signature'         => $sig['id'],
+                        'description'       => $sig['name'] . ' - Match: ' . substr($matches[0], 0, 100),
+                        'file_hash'         => hash('sha256', $content),
                     ];
                 }
             }
@@ -658,6 +664,114 @@ class Linzi_Scanner {
         // Check if file is in wp-admin or wp-includes
         return (strpos($filepath, $abspath . 'wp-admin/') === 0 ||
                 strpos($filepath, $abspath . 'wp-includes/') === 0);
+    }
+
+    /**
+     * Calculate confidence score for a threat based on multiple indicators
+     *
+     * @param string $content File content
+     * @param string $filepath File path
+     * @param array $matched_sig The signature that matched
+     * @return int Confidence percentage (0-100)
+     */
+    private function calculate_confidence($content, $filepath, $matched_sig) {
+        $confidence = 0;
+        $indicators = 0;
+
+        // Base confidence from signature severity
+        switch ($matched_sig['severity']) {
+            case 'critical':
+                $confidence = 70; // High base confidence for critical signatures
+                break;
+            case 'high':
+                $confidence = 50;
+                break;
+            case 'medium':
+                $confidence = 30;
+                break;
+            default:
+                $confidence = 20;
+        }
+
+        // Count additional malware indicators in the same file
+        $indicator_patterns = [
+            '/\beval\s*\(/i',                                           // eval() usage
+            '/base64_decode/i',                                         // Base64 decoding
+            '/\$_(GET|POST|REQUEST|COOKIE)\s*\[/i',                    // User input access
+            '/\b(exec|system|passthru|shell_exec)\s*\(/i',            // System commands
+            '/file_(get|put)_contents\s*\(\s*[\'"]https?:/i',         // Remote file operations
+            '/curl_(init|exec)/i',                                      // cURL operations
+            '/move_uploaded_file/i',                                    // File uploads
+            '/\bcreate_function\s*\(/i',                               // Dynamic function creation
+            '/preg_replace\s*\(.*\/e/i',                               // Code execution via regex
+            '/\bassert\s*\(/i',                                         // Assert (can execute code)
+        ];
+
+        foreach ($indicator_patterns as $pattern) {
+            if (preg_match($pattern, $content)) {
+                $indicators++;
+            }
+        }
+
+        // Adjust confidence based on indicator count
+        if ($indicators >= 5) {
+            $confidence = min(95, $confidence + 30); // Multiple indicators = very high confidence
+        } elseif ($indicators >= 3) {
+            $confidence = min(85, $confidence + 20);
+        } elseif ($indicators >= 2) {
+            $confidence = min(75, $confidence + 10);
+        }
+
+        // Known malware signature names boost confidence
+        $known_malware_keywords = ['backdoor', 'webshell', 'c99', 'r57', 'wso', 'exploit'];
+        foreach ($known_malware_keywords as $keyword) {
+            if (stripos($matched_sig['name'], $keyword) !== false) {
+                $confidence = min(95, $confidence + 10);
+                break;
+            }
+        }
+
+        // File location adjustments
+        if (strpos($filepath, '/mu-plugins/') !== false && $indicators >= 2) {
+            $confidence = min(95, $confidence + 15); // MU-plugins with multiple indicators = very suspicious
+        }
+
+        if (strpos($filepath, '/uploads/') !== false && strpos($filepath, '.php') !== false) {
+            $confidence = min(98, $confidence + 25); // PHP in uploads = almost certainly malware
+        }
+
+        return (int) $confidence;
+    }
+
+    /**
+     * Adjust severity based on context (prevent false CRITICAL on legitimate files)
+     *
+     * @param string $severity Original severity
+     * @param string $filepath File path
+     * @param int $confidence Confidence score
+     * @return string Adjusted severity
+     */
+    private function adjust_severity($severity, $filepath, $confidence) {
+        // Never mark low-confidence detections as critical
+        if ($confidence < 70 && $severity === 'critical') {
+            return 'high';
+        }
+
+        // Plugin directory with medium confidence = downgrade
+        if ($confidence < 60 && strpos($filepath, '/plugins/') !== false) {
+            if ($severity === 'critical') return 'high';
+            if ($severity === 'high') return 'medium';
+        }
+
+        // Known safe directories can't be critical (safety net)
+        $safe_dirs = ['wp-includes/SimplePie', 'wp-includes/PHPMailer', 'wp-includes/sodium'];
+        foreach ($safe_dirs as $safe_dir) {
+            if (strpos($filepath, $safe_dir) !== false) {
+                return ($severity === 'critical') ? 'high' : $severity;
+            }
+        }
+
+        return $severity;
     }
 
     public function quarantine_file($filepath) {
