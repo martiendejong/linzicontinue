@@ -386,15 +386,17 @@ class Linzi_Scanner {
             $content = file_get_contents($filepath);
             if ($content === false) continue;
 
+            // CRITICAL FIX: Skip WordPress core files entirely (wp-admin, wp-includes)
+            // Core files contain legitimate patterns that trigger false positives
+            // (file_get_contents, wp_remote_post, createElement, etc.)
+            if ($this->is_core_file($filepath)) {
+                continue; // Skip all signature checks for core files
+            }
+
             foreach ($this->signatures as $sig) {
                 if (preg_match($sig['pattern'], $content, $matches)) {
                     // Context check for elFinder (only flag outside its own plugin)
                     if ($sig['id'] === 'WPFM_001' && strpos($filepath, 'wp-file-manager') !== false) {
-                        continue;
-                    }
-
-                    // Skip known WordPress core patterns for variable function calls
-                    if ($sig['id'] === 'OBFUSC_003' && $this->is_core_file($filepath)) {
                         continue;
                     }
 
