@@ -74,9 +74,10 @@ class Linzi_Scanner {
             [
                 'id'       => 'OBFUSC_002',
                 'name'     => 'Hex-encoded String Execution',
-                'pattern'  => '/\\\\x[0-9a-fA-F]{2}(\\\\x[0-9a-fA-F]{2}){10,}/s',
+                'pattern'  => '/\\\\x[0-9a-fA-F]{2}(\\\\x[0-9a-fA-F]{2}){30,}/s', // Increased threshold: 30+ hex sequences (was 10+)
                 'severity' => 'high',
                 'type'     => 'obfuscation',
+                'note'     => 'Legitimate binary data (UTF-8 BOMs, encryption keys) typically <30 sequences',
             ],
             [
                 'id'       => 'OBFUSC_003',
@@ -121,6 +122,11 @@ class Linzi_Scanner {
                 'pattern'  => '/(file_get_contents|curl_exec|wp_remote_get)\s*\(.*?(eval|include|require)\s*\(/is',
                 'severity' => 'critical',
                 'type'     => 'fake_plugin',
+                'exclude_patterns' => [
+                    '/wp_remote_get.*wordpress\.org/i', // Legitimate WordPress.org API calls
+                    '/include.*ABSPATH/i',              // Legitimate WordPress core includes
+                    '/require.*ABSPATH/i',              // Legitimate WordPress core requires
+                ],
             ],
 
             // === MU-PLUGIN BACKDOORS (critical - from real breach) ===
@@ -144,6 +150,7 @@ class Linzi_Scanner {
                 'pattern'  => '/\$_FILES\s*\[.*move_uploaded_file/is',
                 'severity' => 'critical',
                 'type'     => 'mu_backdoor',
+                'context'  => 'Only flag in mu-plugins directory, not wp-admin/wp-includes',
             ],
 
             // === POLYMORPHIC JS (variable names change per load) ===
@@ -160,6 +167,13 @@ class Linzi_Scanner {
                 'pattern'  => '/createElement\s*\(\s*[\'"]script[\'"]\s*\).*src\s*=.*\+/is',
                 'severity' => 'high',
                 'type'     => 'polymorphic',
+                'exclude_paths' => [
+                    'wp-includes/js/jquery',            // jQuery library
+                    'wp-includes/js/tinymce',           // TinyMCE editor
+                    'wp-includes/js/mediaelement',      // MediaElement player
+                    'wp-includes/js/codemirror',        // CodeMirror editor
+                    'wp-includes/js/dist',              // WordPress Gutenberg blocks
+                ],
             ],
 
             // === FILE OPERATIONS (suspicious in plugins) ===
@@ -208,6 +222,11 @@ class Linzi_Scanner {
                 'pattern'  => '/(wp_remote_post|curl_exec|file_get_contents)\s*\(.*\$_(SERVER|COOKIE|SESSION)/is',
                 'severity' => 'high',
                 'type'     => 'exfiltration',
+                'exclude_patterns' => [
+                    '/wp_remote_post.*sslverify/i',     // Legitimate WordPress HTTP with SSL verify
+                    '/file_get_contents.*ABSPATH/i',    // Reading local WordPress files
+                    '/\$_SERVER\[.HTTP_HOST.\]/i',      // Legitimate hostname usage
+                ],
             ],
 
             // === WP FILE MANAGER EXPLOIT (specific to CVE from breach) ===
@@ -386,6 +405,13 @@ class Linzi_Scanner {
             $content = file_get_contents($filepath);
             if ($content === false) continue;
 
+            // CRITICAL FIX: Skip WordPress core files entirely (wp-admin, wp-includes)
+            // Core files contain legitimate patterns that trigger false positives
+            // (file_get_contents, wp_remote_post, createElement, etc.)
+            if ($this->is_core_file($filepath)) {
+                continue; // Skip all signature checks for core files
+            }
+
             foreach ($this->signatures as $sig) {
                 if (preg_match($sig['pattern'], $content, $matches)) {
                     // Context check for elFinder (only flag outside its own plugin)
@@ -393,9 +419,38 @@ class Linzi_Scanner {
                         continue;
                     }
 
-                    // Skip known WordPress core patterns for variable function calls
-                    if ($sig['id'] === 'OBFUSC_003' && $this->is_core_file($filepath)) {
-                        continue;
+                    // REFINEMENT: Check exclude_patterns (content-based exclusions)
+                    if (!empty($sig['exclude_patterns'])) {
+                        $excluded = false;
+                        foreach ($sig['exclude_patterns'] as $exclude_pattern) {
+                            if (preg_match($exclude_pattern, $content)) {
+                                $excluded = true;
+                                break;
+                            }
+                        }
+                        if ($excluded) continue;
+                    }
+
+                    // REFINEMENT: Check exclude_paths (location-based exclusions)
+                    if (!empty($sig['exclude_paths'])) {
+                        $excluded = false;
+                        foreach ($sig['exclude_paths'] as $exclude_path) {
+                            if (strpos($filepath, $exclude_path) !== false) {
+                                $excluded = true;
+                                break;
+                            }
+                        }
+                        if ($excluded) continue;
+                    }
+
+                    // REFINEMENT: MU_003 context check (only flag in mu-plugins directory)
+                    if ($sig['id'] === 'MU_003') {
+                        $normalized_path = wp_normalize_path($filepath);
+                        $mu_plugins_path = wp_normalize_path(WPMU_PLUGIN_DIR);
+                        // Only flag if file is actually IN mu-plugins directory
+                        if (strpos($normalized_path, $mu_plugins_path) !== 0) {
+                            continue;
+                        }
                     }
 
                     // Calculate confidence score and adjust severity
