@@ -334,6 +334,20 @@ class Linzi_Scanner {
             $results['threats'][] = $vuln;
         }
 
+        // 10. Self-probe known shell URLs against this site's own live front-end
+        // (catches a shell reachable via a rewritten/cached URL even if its file
+        // was already cleaned up, or was planted outside any directory we scan)
+        foreach ($this->self_probe_shell_urls() as $threat) {
+            $results['threats'][] = $threat;
+        }
+
+        // 11. Scan this site's own rendered homepage HTML for injected/spam content
+        // (a compromised theme template or mu-plugin can inject content that never
+        // shows up as a suspicious FILE, only in the rendered output)
+        foreach ($this->scan_homepage_html() as $threat) {
+            $results['threats'][] = $threat;
+        }
+
         // Store threats in database
         $this->store_threats($results['threats']);
 
@@ -378,15 +392,28 @@ class Linzi_Scanner {
         );
 
         foreach ($iterator as $file) {
-            if ($file->isDir()) continue;
+            $filepath = $file->getPathname();
+
+            if ($file->isDir()) {
+                if (strpos($filepath, 'linzicontinue') === false && strpos($filepath, 'linzi-quarantine') === false) {
+                    $this->check_suspicious_directory_name($file->getFilename(), $filepath, $results);
+                }
+                continue;
+            }
+
+            // Skip our own plugin and quarantine
+            if (strpos($filepath, 'linzicontinue') !== false) continue;
+            if (strpos($filepath, 'linzi-quarantine') !== false) continue;
+
+            // Filename-only checks (known shell names, hex-extension disguise, malicious
+            // .htaccess) run BEFORE the extension allowlist below, since attackers pick
+            // these exact names/extensions specifically to slip past a plain allowlist.
+            if ($this->check_filename_based_threats($file->getFilename(), $filepath, $results)) {
+                continue;
+            }
 
             $ext = strtolower($file->getExtension());
             if (!in_array($ext, $extensions)) continue;
-
-            // Skip our own plugin and quarantine
-            $filepath = $file->getPathname();
-            if (strpos($filepath, 'linzicontinue') !== false) continue;
-            if (strpos($filepath, 'linzi-quarantine') !== false) continue;
 
             $results['files_scanned']++;
 
@@ -486,6 +513,97 @@ class Linzi_Scanner {
         return $results;
     }
 
+    /**
+     * Suspicious hex/campaign-named directory detection, ported from
+     * jengo-system-private/tools/wp-malware-scan-ftp.py's walk() SUSP-DIR checks.
+     * Content-based signatures never see a bare directory name, so this is a
+     * separate check rather than an entry in $this->signatures.
+     */
+    public function check_suspicious_directory_name($dirname, $dirpath, array &$results) {
+        $is_suspicious = false;
+
+        if (preg_match('/^[0-9a-f]{4,8}$/i', $dirname)) {
+            $is_suspicious = true;
+        } elseif (in_array($dirname, ['wp-includes88', 'cgi-bin88'], true)) {
+            $is_suspicious = true;
+        } elseif (preg_match('/^(assets|img|js|css|forum|mangera|slurbow|boss2026yt|br2026yt)[0-9a-f]{5,}$/i', $dirname)) {
+            $is_suspicious = true;
+        }
+
+        if ($is_suspicious) {
+            $results['threats'][] = [
+                'file_path'   => $dirpath,
+                'threat_type' => 'suspicious_directory',
+                'severity'    => 'high',
+                'signature'   => 'SUSP_DIR',
+                'description' => 'Suspicious hex/campaign-named directory: ' . $dirname,
+            ];
+        }
+    }
+
+    /**
+     * Filename-only threat checks that must run BEFORE the extension allowlist in
+     * scan_directory()/scan_root_files(), ported from
+     * jengo-system-private/tools/wp-malware-scan-ftp.py:
+     *   - known malicious shell filenames (flagged by NAME, not content - catches
+     *     a shell whose content is packed/obfuscated past the content signatures)
+     *   - hex-extension disguise (e.g. shell.php4a9f) - deliberately not a plain
+     *     ".php" extension, so it would otherwise never reach the allowlist check
+     *   - malicious .htaccess content (rewrite/shell-whitelist rules planted by an
+     *     attacker; .htaccess has no extension so it never reached signature scanning)
+     *
+     * Returns true when the file was fully handled here (caller should `continue`
+     * without running the normal extension-allowlist/content-signature path too).
+     */
+    public function check_filename_based_threats($filename, $filepath, array &$results) {
+        $low = strtolower($filename);
+
+        if (substr($low, -4) === '.php' && preg_match(
+            '/^(worksec|filefuns|wp-geren|wp-sx|wp-log1n|mah|motu|theme-editor-[0-9a-f]+|adminer\w*|alfa\w*|wso\w*|c99\w*|r57\w*)\.php$/i',
+            $filename
+        )) {
+            $results['files_scanned']++;
+            $results['threats'][] = [
+                'file_path'   => $filepath,
+                'threat_type' => 'webshell',
+                'severity'    => 'critical',
+                'signature'   => 'SHELL_NAME',
+                'description' => 'Filename matches a known malicious shell naming pattern: ' . $filename,
+            ];
+            return true;
+        }
+
+        if (preg_match('/\.php[0-9a-f]{4,}$/i', $filename)) {
+            $results['files_scanned']++;
+            $results['threats'][] = [
+                'file_path'   => $filepath,
+                'threat_type' => 'hex_extension_disguise',
+                'severity'    => 'critical',
+                'signature'   => 'HEX_EXT',
+                'description' => 'PHP file disguised with a hex-suffixed extension: ' . $filename,
+            ];
+            return true;
+        }
+
+        if ($low === '.htaccess') {
+            $results['files_scanned']++;
+            $content = file_get_contents($filepath);
+            if ($content !== false && preg_match('/filefuns|worksec|theme-editor|system_log\.php|inputs\.php|adminfuns/i', $content)) {
+                $results['threats'][] = [
+                    'file_path'   => $filepath,
+                    'threat_type' => 'malicious_htaccess',
+                    'severity'    => 'critical',
+                    'signature'   => 'HTACCESS_MAL',
+                    'description' => 'Malicious rewrite/shell-whitelist rule detected in .htaccess',
+                    'file_hash'   => hash('sha256', $content),
+                ];
+            }
+            return true;
+        }
+
+        return false;
+    }
+
     private function scan_uploads($results) {
         $uploads_dir = wp_upload_dir()['basedir'];
         if (!is_dir($uploads_dir)) return $results;
@@ -525,6 +643,19 @@ class Linzi_Scanner {
                     'description' => 'Suspicious double extension detected: ' . $filename,
                 ];
             }
+
+            // Hex-extension disguise (e.g. shell.php4a9f) - a bare ".php" allowlist
+            // check above never matches this on purpose, uploads is the most common
+            // real-world drop location for it
+            if (preg_match('/\.php[0-9a-f]{4,}$/i', $filename)) {
+                $results['threats'][] = [
+                    'file_path'   => $file->getPathname(),
+                    'threat_type' => 'hex_extension_disguise',
+                    'severity'    => 'critical',
+                    'signature'   => 'HEX_EXT',
+                    'description' => 'PHP file disguised with a hex-suffixed extension: ' . $filename,
+                ];
+            }
         }
 
         return $results;
@@ -539,11 +670,25 @@ class Linzi_Scanner {
             'wp-config-sample.php', 'license.txt', 'readme.html',
         ];
 
-        $root_files = glob(ABSPATH . '*.php');
-        if (!$root_files) return $results;
+        // scandir() instead of glob('*.php') - a plain glob misses hex-extension
+        // disguised files (shell.php4a9f) and never looks at .htaccess content at all
+        $entries = @scandir(ABSPATH);
+        if ($entries === false) return $results;
 
-        foreach ($root_files as $file) {
-            $filename = basename($file);
+        foreach ($entries as $filename) {
+            if ($filename === '.' || $filename === '..') continue;
+            $file = ABSPATH . $filename;
+            if (is_dir($file)) continue;
+
+            // Filename-only checks (known shell names, hex-extension disguise,
+            // malicious .htaccess) - same as scan_directory(), run before anything
+            // that assumes a plain ".php" extension
+            if ($this->check_filename_based_threats($filename, $file, $results)) {
+                continue;
+            }
+
+            if (substr(strtolower($filename), -4) !== '.php') continue;
+
             $results['files_scanned']++;
 
             if (!in_array($filename, $known_root_files)) {
@@ -710,6 +855,125 @@ class Linzi_Scanner {
         }
 
         return $threats;
+    }
+
+    /**
+     * Known malicious shell paths to self-probe (ported from
+     * jengo-system-private/tools/wp-malware-scan-rest.py's shell URL probe list).
+     */
+    public function get_known_shell_probe_paths() {
+        return [
+            '/worksec.php', '/filefuns.php', '/wp-geren.php', '/mah.php', '/motu.php',
+            '/wp-content/db.php', '/theme-editor.php', '/wp-sx.php', '/wp-log1n.php',
+            '/k2.php', '/wp-content/uploads/shell.php',
+        ];
+    }
+
+    /**
+     * Pure evaluator: a 200 response for a known shell path is itself the threat,
+     * independent of how the HTTP call was made - kept separate from
+     * self_probe_shell_urls() so it can be unit-tested without a live HTTP round trip.
+     */
+    public function evaluate_shell_probe_response($path, $http_code) {
+        if ((int) $http_code !== 200) {
+            return null;
+        }
+
+        return [
+            'file_path'   => $path,
+            'threat_type' => 'live_shell_probe',
+            'severity'    => 'critical',
+            'signature'   => 'SELF_PROBE',
+            'description' => 'Known malicious shell URL responded 200 on this site: ' . $path,
+        ];
+    }
+
+    /**
+     * Self-probe known shell URLs against this site's own live front-end (catches a
+     * shell reachable via a rewritten/cached URL even after its file was cleaned up,
+     * or one planted outside any directory the filesystem scan above covers).
+     */
+    public function self_probe_shell_urls() {
+        $threats = [];
+
+        foreach ($this->get_known_shell_probe_paths() as $path) {
+            $response = wp_remote_get(home_url($path), [
+                'timeout'     => 15,
+                'redirection' => 0,
+            ]);
+
+            if (is_wp_error($response)) {
+                continue;
+            }
+
+            $threat = $this->evaluate_shell_probe_response($path, wp_remote_retrieve_response_code($response));
+            if ($threat !== null) {
+                $threats[] = $threat;
+            }
+        }
+
+        return $threats;
+    }
+
+    /**
+     * Homepage injection/spam signatures (ported from
+     * jengo-system-private/tools/wp-malware-scan-rest.py's HOMEPAGE HTML scan).
+     */
+    public function get_homepage_injection_signatures() {
+        return [
+            'eval('                              => '/eval\s*\(/i',
+            'base64_decode'                      => '/base64_decode/i',
+            'document.write(unescape'            => '/document\.write\(unescape/i',
+            'fromCharCode-heavy'                 => '/fromCharCode/i',
+            'hidden spam div'                    => '/style\s*=\s*["\'][^"\']*(display\s*:\s*none|position\s*:\s*absolute;\s*left\s*:\s*-\d{3,})/i',
+            'suspicious eval script'             => '/<script[^>]*>[^<]*eval/i',
+            'known spam keyword'                 => '/\b(viagra|cialis|casino|replica watches|payday loan)\b/i',
+            'external .ru/.cn/.top/.xyz script'  => '/<script[^>]+src=["\']https?:\/\/[^"\']+\.(ru|cn|top|xyz)\//i',
+        ];
+    }
+
+    /**
+     * Pure evaluator: match rendered HTML against the homepage injection signatures.
+     * Kept separate from scan_homepage_html() so it can be unit-tested against a
+     * fixture string without a live HTTP round trip.
+     */
+    public function evaluate_homepage_html($html) {
+        $threats = [];
+        if (empty($html)) {
+            return $threats;
+        }
+
+        foreach ($this->get_homepage_injection_signatures() as $label => $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                $threats[] = [
+                    'file_path'   => 'homepage:/',
+                    'threat_type' => 'homepage_injection',
+                    'severity'    => 'high',
+                    'signature'   => 'HOMEPAGE_SCAN',
+                    'description' => sprintf('Homepage HTML matches "%s": %s', $label, substr($matches[0], 0, 100)),
+                ];
+            }
+        }
+
+        return $threats;
+    }
+
+    /**
+     * Scan this site's own rendered homepage HTML for injected/spam content - a
+     * compromised theme template or mu-plugin can inject content that never shows
+     * up as a suspicious FILE on disk, only in the rendered output.
+     */
+    public function scan_homepage_html() {
+        $response = wp_remote_get(home_url('/?linzi_scan=' . time()), [
+            'timeout'     => 20,
+            'redirection' => 2,
+        ]);
+
+        if (is_wp_error($response)) {
+            return [];
+        }
+
+        return $this->evaluate_homepage_html(wp_remote_retrieve_body($response));
     }
 
     private function is_core_file($filepath) {
