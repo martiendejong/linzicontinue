@@ -39,6 +39,7 @@ function is_wp_error($thing) { return $thing instanceof WP_Error; }
 function wp_remote_retrieve_response_code($response) { return $response['response']['code'] ?? 0; }
 function wp_remote_retrieve_body($response) { return $response['body'] ?? ''; }
 function home_url($path = '') { return 'https://example-test-site.local' . $path; }
+function wp_upload_dir() { return ['basedir' => $GLOBALS['__linzi_test_uploads_dir'] ?? sys_get_temp_dir()]; }
 
 require_once dirname(__DIR__) . '/includes/class-scanner.php';
 
@@ -210,6 +211,37 @@ check('scan_content_root_directories() does NOT flag the normal "plugins" direct
 @rmdir(WP_CONTENT_DIR . '/plugins');
 @rmdir(WP_CONTENT_DIR);
 @rmdir(ABSPATH);
+
+// ============================================================
+// 8. scan_uploads() must ALSO run the filename-based checks (malicious .htaccess,
+//    suspicious directory names) - review round 2 fix. Before this fix, scan_uploads()
+//    duplicated only the hex-extension check inline and skipped directories entirely
+//    (`if ($file->isDir()) continue;`), so a malicious .htaccess or a hex/campaign-named
+//    subdirectory dropped inside wp-content/uploads was never flagged by any scan path,
+//    even though the original FTP script's walk() checks both anywhere in the tree.
+// ============================================================
+$GLOBALS['__linzi_test_uploads_dir'] = sys_get_temp_dir() . '/linzi-test-uploads-' . getmypid();
+@mkdir($GLOBALS['__linzi_test_uploads_dir'], 0777, true);
+@mkdir($GLOBALS['__linzi_test_uploads_dir'] . '/4f9a2b1c');
+file_put_contents($GLOBALS['__linzi_test_uploads_dir'] . '/.htaccess', "RewriteEngine On\nRewriteRule ^filefuns\\.php$ - [L]\n");
+file_put_contents($GLOBALS['__linzi_test_uploads_dir'] . '/photo.jpg', 'not php');
+
+$results = ['threats' => [], 'files_scanned' => 0];
+$results = call_private_method($scanner, 'scan_uploads', $results);
+
+$uploads_htaccess_hits = array_filter($results['threats'], fn($t) => $t['signature'] === 'HTACCESS_MAL');
+check('scan_uploads() flags a malicious .htaccess inside uploads', count($uploads_htaccess_hits) === 1);
+
+$uploads_dir_hits = array_filter($results['threats'], fn($t) => $t['signature'] === 'SUSP_DIR' && strpos($t['file_path'], '4f9a2b1c') !== false);
+check('scan_uploads() flags a hex-named subdirectory inside uploads', count($uploads_dir_hits) === 1);
+
+$clean_file_hits = array_filter($results['threats'], fn($t) => strpos($t['file_path'], 'photo.jpg') !== false);
+check('scan_uploads() does NOT flag a plain non-PHP upload', count($clean_file_hits) === 0);
+
+@unlink($GLOBALS['__linzi_test_uploads_dir'] . '/.htaccess');
+@unlink($GLOBALS['__linzi_test_uploads_dir'] . '/photo.jpg');
+@rmdir($GLOBALS['__linzi_test_uploads_dir'] . '/4f9a2b1c');
+@rmdir($GLOBALS['__linzi_test_uploads_dir']);
 
 // ============================================================
 echo "\n=== RESULTS: $pass passed, $fail failed ===\n";

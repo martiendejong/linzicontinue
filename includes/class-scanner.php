@@ -615,12 +615,34 @@ class Linzi_Scanner {
 
         $php_extensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'pht', 'phps'];
 
+        // SELF_FIRST (not the default LEAVES_ONLY) so the loop below actually visits
+        // directory nodes too, not just files - needed for the suspicious-directory-name
+        // check on isDir().
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($uploads_dir, RecursiveDirectoryIterator::SKIP_DOTS)
+            new RecursiveDirectoryIterator($uploads_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
         );
 
         foreach ($iterator as $file) {
-            if ($file->isDir()) continue;
+            if ($file->isDir()) {
+                // Suspicious hex/campaign-named directories can be dropped inside
+                // uploads too, not just at the webroot/wp-content root - same check
+                // used everywhere else in this scanner.
+                $this->check_suspicious_directory_name($file->getFilename(), $file->getPathname(), $results);
+                continue;
+            }
+
+            $filename = $file->getFilename();
+
+            // Filename-only checks (known shell names, hex-extension disguise,
+            // malicious .htaccess) - same as scan_directory()/scan_root_files().
+            // Uploads especially needs the .htaccess check: a hardened install's
+            // own uploads/.htaccess commonly disables PHP execution there, and an
+            // attacker can overwrite it to whitelist/re-enable execution for their
+            // own dropped filename.
+            if ($this->check_filename_based_threats($filename, $file->getPathname(), $results)) {
+                continue;
+            }
 
             $ext = strtolower($file->getExtension());
             $results['files_scanned']++;
@@ -638,7 +660,6 @@ class Linzi_Scanner {
             }
 
             // Check for double extensions (e.g., image.php.jpg)
-            $filename = $file->getFilename();
             if (preg_match('/\.php\d?\./i', $filename) || preg_match('/\.phtml?\./i', $filename)) {
                 $results['threats'][] = [
                     'file_path'   => $file->getPathname(),
@@ -646,19 +667,6 @@ class Linzi_Scanner {
                     'severity'    => 'high',
                     'signature'   => 'UPLOAD_002',
                     'description' => 'Suspicious double extension detected: ' . $filename,
-                ];
-            }
-
-            // Hex-extension disguise (e.g. shell.php4a9f) - a bare ".php" allowlist
-            // check above never matches this on purpose, uploads is the most common
-            // real-world drop location for it
-            if (preg_match('/\.php[0-9a-f]{4,}$/i', $filename)) {
-                $results['threats'][] = [
-                    'file_path'   => $file->getPathname(),
-                    'threat_type' => 'hex_extension_disguise',
-                    'severity'    => 'critical',
-                    'signature'   => 'HEX_EXT',
-                    'description' => 'PHP file disguised with a hex-suffixed extension: ' . $filename,
                 ];
             }
         }
