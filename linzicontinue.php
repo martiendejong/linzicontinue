@@ -3,7 +3,7 @@
  * Plugin Name: Linzi Security
  * Plugin URI: https://linzicontinue.com
  * Description: Advanced WordPress security suite - firewall, malware scanner, login protection, file integrity monitoring, mu-plugins guardian, and real-time threat dashboard. Built from real-world breach forensics.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Promotiemeester
  * Author URI: https://promotiemeester.nl
  * License: GPL v2 or later
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LINZI_VERSION', '1.0.0');
+define('LINZI_VERSION', '1.1.0');
 define('LINZI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('LINZI_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('LINZI_PLUGIN_BASENAME', plugin_basename(__FILE__));

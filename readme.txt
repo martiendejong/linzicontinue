@@ -4,7 +4,7 @@ Tags: security, firewall, malware, scanner, mu-plugins, login protection, harden
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -77,7 +77,30 @@ Yes, but we recommend disabling overlapping features to avoid conflicts (e.g., d
 
 The file is moved to a protected directory (wp-content/linzi-quarantine/) with metadata preserved. It can be restored at any time.
 
+= Can Linzi scan a site it isn't installed on? =
+
+No, and this is deliberate scope. Linzi's scanner (filesystem checks, self-probe, homepage
+scan) only ever runs from inside the WordPress install it's protecting - a plugin has no way
+to reach a site where it was never activated in the first place. For an incident-response
+scan of a site with no Linzi install (e.g. before onboarding it, or a one-off cleanup on a
+client site you don't manage), the standalone Python scripts remain the tool for that job:
+`jengo-system-private/tools/wp-malware-scan-ftp.py` (filesystem scan over FTP) and
+`wp-malware-scan-rest.py` (HTTP/REST audit for Cloudflare-fronted origins with no FTP access).
+Most of their filesystem detection logic (filename-based shell detection, hex-extension
+disguise, malicious .htaccess content, suspicious hex/campaign-named directories) and their
+self-probe/homepage-scan checks are now duplicated in `includes/class-scanner.php` for sites
+that do run Linzi - see the two scripts' own header comments for the cross-reference.
+
 == Changelog ==
+
+= 1.1.0 =
+* Malware Scanner: filename-based known-shell detection (c99/r57/wso/etc, flagged by name even when content is packed/obfuscated)
+* Malware Scanner: hex-extension disguise detection (e.g. shell.php4a9f)
+* Malware Scanner: malicious .htaccess content detection
+* Malware Scanner: suspicious hex/campaign-named directory detection
+* Malware Scanner: self-probe of known shell URLs against the site's own front-end
+* Malware Scanner: homepage HTML scan for injected/spam content
+* Ported from jengo-system-private's standalone wp-malware-scan-ftp.py / wp-malware-scan-rest.py incident-response scripts
 
 = 1.0.0 =
 * Initial release
