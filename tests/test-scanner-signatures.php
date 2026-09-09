@@ -12,8 +12,14 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 
 // --- minimal WP stubs, just enough to construct Linzi_Scanner and drive the new
 // self-probe/homepage-scan wrappers without a real WordPress install ---
-define('ABSPATH', __DIR__ . '/fixtures/');
+// Deliberately NOT under __DIR__: this checkout's own folder name contains the
+// substring "linzicontinue" (e.g. a task-numbered worktree like
+// "linzicontinue-755"), which would otherwise collide with the own-plugin
+// exclusion check in scan_root_files()/scan_content_root_directories() and
+// silently skip every fixture directory created for section 7 below.
+define('ABSPATH', sys_get_temp_dir() . '/linzi-test-abspath-' . getmypid() . '/');
 define('LINZI_PLUGIN_DIR', dirname(__DIR__) . '/');
+define('WP_CONTENT_DIR', ABSPATH . 'wp-content');
 
 class WP_Error {}
 
@@ -165,6 +171,45 @@ $GLOBALS['__linzi_test_http'] = [
 ];
 $threats = $scanner->scan_homepage_html();
 check('scan_homepage_html() end-to-end finds the injected script', count($threats) >= 1);
+
+// ============================================================
+// 7. Root-level and wp-content-level suspicious directory scanning
+//    (PR #4 CHANGES REQUESTED fix: scan_root_files() used to skip directories
+//    entirely via `if (is_dir($file)) continue;`, and no scan path ever checked
+//    wp-content's own direct children - only nested plugins/mu-plugins/themes.
+//    These are the two locations the original FTP script's SUSP-DIR check
+//    actually targets, so both are exercised end-to-end against real fixture
+//    directories through the real private methods, not a re-implementation.)
+// ============================================================
+function call_private_method($obj, $method, ...$args) {
+    $ref = new ReflectionMethod($obj, $method);
+    $ref->setAccessible(true);
+    return $ref->invoke($obj, ...$args);
+}
+
+@mkdir(ABSPATH, 0777, true);
+@mkdir(ABSPATH . '4f9a2b');
+@mkdir(WP_CONTENT_DIR, 0777, true);
+@mkdir(WP_CONTENT_DIR . '/ab12cd');
+@mkdir(WP_CONTENT_DIR . '/plugins', 0777, true);
+
+$results = ['threats' => [], 'files_scanned' => 0];
+$results = call_private_method($scanner, 'scan_root_files', $results);
+$root_hits = array_filter($results['threats'], fn($t) => $t['signature'] === 'SUSP_DIR' && $t['file_path'] === ABSPATH . '4f9a2b');
+check('scan_root_files() flags a hex-named directory dropped at the webroot root', count($root_hits) === 1);
+
+$results = ['threats' => [], 'files_scanned' => 0];
+$results = call_private_method($scanner, 'scan_content_root_directories', $results);
+$content_hits = array_filter($results['threats'], fn($t) => $t['signature'] === 'SUSP_DIR' && $t['file_path'] === WP_CONTENT_DIR . '/ab12cd');
+check('scan_content_root_directories() flags a hex-named directory dropped directly under wp-content', count($content_hits) === 1);
+$plugins_hits = array_filter($results['threats'], fn($t) => strpos($t['file_path'], 'plugins') !== false);
+check('scan_content_root_directories() does NOT flag the normal "plugins" directory itself', count($plugins_hits) === 0);
+
+@rmdir(ABSPATH . '4f9a2b');
+@rmdir(WP_CONTENT_DIR . '/ab12cd');
+@rmdir(WP_CONTENT_DIR . '/plugins');
+@rmdir(WP_CONTENT_DIR);
+@rmdir(ABSPATH);
 
 // ============================================================
 echo "\n=== RESULTS: $pass passed, $fail failed ===\n";

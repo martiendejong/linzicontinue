@@ -298,8 +298,13 @@ class Linzi_Scanner {
         // 4. Scan wp-content/uploads (should NOT contain PHP)
         $results = $this->scan_uploads($results);
 
-        // 5. Scan WordPress root for rogue PHP files
+        // 5. Scan WordPress root for rogue PHP files (and root-level directory names)
         $results = $this->scan_root_files($results);
+
+        // 5b. Check wp-content's own direct child directory names - scan_directory()
+        // above only walks plugins/mu-plugins/themes nested inside wp-content, never
+        // wp-content itself.
+        $results = $this->scan_content_root_directories($results);
 
         if ($type === 'deep') {
             // 6. Scan wp-includes for modifications
@@ -678,7 +683,16 @@ class Linzi_Scanner {
         foreach ($entries as $filename) {
             if ($filename === '.' || $filename === '..') continue;
             $file = ABSPATH . $filename;
-            if (is_dir($file)) continue;
+
+            if (is_dir($file)) {
+                // Suspicious hex/campaign-named directories dropped directly at the
+                // webroot are otherwise never checked: scan_directory() only walks
+                // wp-content/plugins, mu-plugins and themes - never the site root.
+                if (strpos($file, 'linzicontinue') === false && strpos($file, 'linzi-quarantine') === false) {
+                    $this->check_suspicious_directory_name($filename, $file, $results);
+                }
+                continue;
+            }
 
             // Filename-only checks (known shell names, hex-extension disguise,
             // malicious .htaccess) - same as scan_directory(), run before anything
@@ -716,6 +730,30 @@ class Linzi_Scanner {
                     }
                 }
             }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Checks wp-content's own direct child directory names for suspicious
+     * hex/campaign naming. scan_directory() is only ever pointed at
+     * wp-content/plugins, wp-content/mu-plugins and wp-content/themes - it never
+     * inspects wp-content itself - so a hex-named folder dropped directly under
+     * wp-content (not nested inside one of those three) would otherwise never be
+     * flagged by any real scan path.
+     */
+    private function scan_content_root_directories($results) {
+        $entries = @scandir(WP_CONTENT_DIR);
+        if ($entries === false) return $results;
+
+        foreach ($entries as $dirname) {
+            if ($dirname === '.' || $dirname === '..') continue;
+            $dirpath = WP_CONTENT_DIR . '/' . $dirname;
+            if (!is_dir($dirpath)) continue;
+            if (strpos($dirpath, 'linzicontinue') !== false || strpos($dirpath, 'linzi-quarantine') !== false) continue;
+
+            $this->check_suspicious_directory_name($dirname, $dirpath, $results);
         }
 
         return $results;
